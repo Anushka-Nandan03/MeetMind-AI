@@ -20,7 +20,7 @@ app = FastAPI(
     version="0.1.0",
 )
 
-# Allow the Vite frontend ports, including the current port 5175.
+# Allow the Vite frontend ports.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -80,12 +80,21 @@ async def transcribe(
     file: UploadFile = File(...),
     language: str | None = None,
 ):
+    # Debug: inspect what the frontend sends.
+    print(
+        f"DEBUG: requested language = {language!r}",
+        flush=True,
+    )
+
     extension = Path(file.filename or "").suffix.lower()
 
     if extension not in ALLOWED_EXTENSIONS:
         raise HTTPException(
             status_code=400,
-            detail="Unsupported file type. Upload MP3, WAV, M4A, WEBM, or MP4.",
+            detail=(
+                "Unsupported file type. Upload MP3, WAV, "
+                "M4A, WEBM, or MP4."
+            ),
         )
 
     temp_path = None
@@ -121,10 +130,33 @@ async def transcribe(
                 detail="The uploaded file is empty.",
             )
 
+        print(
+            f"DEBUG: uploaded file = {file.filename!r}, "
+            f"size = {total_size} bytes",
+            flush=True,
+        )
+
         result = await run_in_threadpool(
             transcribe_file,
             temp_path,
             language,
+        )
+
+        # Debug: inspect what Faster-Whisper detected.
+        print(
+            f"DEBUG: detected language = "
+            f"{result.get('language')!r}",
+            flush=True,
+        )
+        print(
+            f"DEBUG: language probability = "
+            f"{result.get('language_probability')!r}",
+            flush=True,
+        )
+        print(
+            f"DEBUG: segment count = "
+            f"{len(result.get('segments', []))}",
+            flush=True,
         )
 
         return {
@@ -139,7 +171,10 @@ async def transcribe(
         traceback.print_exc()
         raise HTTPException(
             status_code=500,
-            detail=f"Transcription failed: {type(exc).__name__}: {exc}",
+            detail=(
+                f"Transcription failed: "
+                f"{type(exc).__name__}: {exc}"
+            ),
         ) from exc
 
     finally:
@@ -158,7 +193,10 @@ def summarize_meeting(request: SummaryRequest):
         traceback.print_exc()
         raise HTTPException(
             status_code=502,
-            detail=f"Summary generation failed: {type(exc).__name__}: {exc}",
+            detail=(
+                f"Summary generation failed: "
+                f"{type(exc).__name__}: {exc}"
+            ),
         ) from exc
 
 
@@ -202,7 +240,10 @@ def save_meeting(request: MeetingSaveRequest):
         traceback.print_exc()
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to save meeting: {type(exc).__name__}: {exc}",
+            detail=(
+                f"Failed to save meeting: "
+                f"{type(exc).__name__}: {exc}"
+            ),
         ) from exc
 
 
@@ -231,5 +272,9 @@ def get_meetings():
         traceback.print_exc()
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to fetch meetings: {type(exc).__name__}: {exc}",
+            detail=(
+                f"Failed to fetch meetings: "
+                f"{type(exc).__name__}: {exc}"
+            ),
         ) from exc
+    
